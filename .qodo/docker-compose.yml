@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  # ----------------------------------
+  # Service Backend (API Node.js)
+  # ----------------------------------
+  api:
+    build:
+      context: . # Assurez-vous que ce chemin est correct
+      dockerfile: Dockerfile
+    container_name: ljmdi_api
+    restart: always
+    ports:
+      - "5000:5000" # Le Backend doit être sur le port 5000 pour React
+    depends_on:
+      - db
+    environment:
+      # Variables d'environnement pour connecter l'API à la base de données
+      DATABASE_URL: postgres://user:password@db:5432/ljmdi_db
+      NODE_ENV: development
+      PORT: 5000
+      JWT_SECRET: votre_clé_secrete_securisee # Remplacez ceci par une vraie clé
+
+  # ----------------------------------
+  # Service Base de Données (PostgreSQL)
+  # ----------------------------------
+  db:
+    image: postgres:14-alpine
+    container_name: ljmdi_db
+    restart: always
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: ljmdi_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data # Persistance des données
+    ports:
+      - "5432:5432" # Optionnel, pour se connecter avec un outil externe
+
+volumes:
+  postgres_data:
