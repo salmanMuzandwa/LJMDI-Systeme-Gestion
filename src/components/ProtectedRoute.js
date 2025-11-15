@@ -1,25 +1,33 @@
+// src/components/ProtectedRoute.js
+
 import React from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { CircularProgress, Box } from '@mui/material';
 
-const ProtectedRoute = ({ children }) => {
-    const { isAuthenticated, loading } = useAuth();
+const ProtectedRoute = ({ requiredPermission, children }) => {
+    const { isAuthenticated, loading, hasPermission } = useAuth();
 
     if (loading) {
         return (
-            <Box
-                display="flex"
-                justifyContent="center"
-                alignItems="center"
-                minHeight="100vh"
-            >
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
                 <CircularProgress />
             </Box>
         );
     }
 
-    return isAuthenticated ? children : <Navigate to="/login" replace />;
+    if (!isAuthenticated) {
+        return <Navigate to="/login" replace />;
+    }
+
+    if (requiredPermission && !hasPermission(requiredPermission)) {
+        // Redirection vers le dashboard si l'utilisateur est connecté mais n'a pas la permission
+        return <Navigate to="/dashboard" replace />;
+    }
+
+    // If children were passed directly (pattern used in App.js), render them.
+    // Otherwise use <Outlet /> for nested routes.
+    return children ? children : <Outlet />;
 };
 
 export default ProtectedRoute;

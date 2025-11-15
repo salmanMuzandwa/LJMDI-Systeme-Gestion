@@ -37,7 +37,7 @@ import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
 
 export default function Profil() {
-    const [user, setUser] = useState([]);
+    const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
@@ -50,21 +50,38 @@ export default function Profil() {
         adresse: '',
         profession: ''
     });
-    const [userStats, setUserStats] = useState([]);
+    const [userStats, setUserStats] = useState(null);
     const { user: authUser, hasPermission } = useAuth();
 
     useEffect(() => {
-        fetchUserData();
-        fetchUserStats();
-    }, []);
+        if (authUser) {
+            // Utiliser les données de l'utilisateur connecté comme fallback
+            setUser(authUser);
+            setFormData({
+                nom: authUser.nom || '',
+                prenom: authUser.prenom || '',
+                email: authUser.email || '',
+                telephone: authUser.telephone || '',
+                adresse: '',
+                profession: authUser.profession || ''
+            });
+            fetchUserData();
+            fetchUserStats();
+        }
+    }, [authUser]);
 
     const fetchUserData = async () => {
         try {
             const response = await axios.get('/api/user/profile');
             setUser(response.data);
             setFormData(response.data);
+            setError('');
         } catch (error) {
-            setError('Erreur lors du chargement du profil');
+            console.error('Erreur lors du chargement du profil:', error);
+            // Ne pas afficher l'erreur si nous avons les données de base de authUser
+            if (!authUser) {
+                setError('Erreur lors du chargement du profil');
+            }
         } finally {
             setLoading(false);
         }
@@ -76,6 +93,14 @@ export default function Profil() {
             setUserStats(response.data);
         } catch (error) {
             console.error('Erreur lors du chargement des statistiques:', error);
+            // Données par défaut en cas d'erreur
+            setUserStats({
+                totalContributions: 0,
+                totalPresences: 0,
+                tauxParticipation: 0,
+                activitesParticipees: 0,
+                activitesRecentess: []
+            });
         }
     };
 

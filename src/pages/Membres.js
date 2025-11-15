@@ -1,356 +1,347 @@
+// src/pages/Membres.js
+
 import React, { useState, useEffect } from 'react';
 import {
-    Box,
-    Typography,
-    Button,
-    Paper,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TableRow,
-    Chip,
-    IconButton,
-    Dialog,
-    DialogTitle,
-    DialogContent,
-    DialogActions,
-    TextField,
-    MenuItem,
-    Grid,
-    Avatar,
-    Tooltip,
-    Alert,
-    CircularProgress,
+    Container, Typography, Paper, Table, TableBody, TableCell,
+    TableContainer, TableHead, TableRow, CircularProgress, Alert, Button, Box,
+    Checkbox, Menu, MenuItem, ListItemIcon, ListItemText
 } from '@mui/material';
-import {
-    Add as AddIcon,
-    Edit as EditIcon,
-    Delete as DeleteIcon,
-    Visibility as ViewIcon,
-    Email as EmailIcon,
-    Phone as PhoneIcon,
-} from '@mui/icons-material';
-import { useAuth } from '../contexts/AuthContext';
+import { Add, Edit, Delete, Visibility, Print, PrintDisabled } from '@mui/icons-material';
 import axios from 'axios';
+import { useAuth } from '../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
-const statuts = [
-    { value: 'Actif', label: 'Actif' },
-    { value: 'Inactif', label: 'Inactif' },
-    { value: 'Régulier', label: 'Régulier' },
-];
-
-export default function Membres() {
-    const [membres, setMembres] = useState([]);
+const Members = () => {
+    const [members, setMembers] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
-    const [dialogOpen, setDialogOpen] = useState(false);
-    const [selectedMembre, setSelectedMembre] = useState([]);
-    const [formData, setFormData] = useState({
-        nom: '',
-        prenom: '',
-        email: '',
-        telephone: '',
-        date_adhesion: '',
-        statut: 'Actif',
-        adresse: '',
-        profession: ''
-    });
-    const { hasPermission } = useAuth();
+    const [error, setError] = useState(null);
+    const [selectedMembers, setSelectedMembers] = useState([]);
+    const [printMenuAnchor, setPrintMenuAnchor] = useState(null);
+    const { token } = useAuth();
+    const navigate = useNavigate();
 
     useEffect(() => {
-        fetchMembres();
-    }, []);
-
-    const fetchMembres = async () => {
-        try {
-            const response = await axios.get('/api/membres');
-            setMembres(response.data);
-        } catch (error) {
-            setError('Erreur lors du chargement des membres');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleOpenDialog = (membre = []) => {
-        if (membre) {
-            setFormData(membre);
-            setSelectedMembre(membre);
-        } else {
-            setFormData({
-                nom: '',
-                prenom: '',
-                email: '',
-                telephone: '',
-                date_adhesion: new Date().toISOString().split('T')[0],
-                statut: 'Actif',
-                adresse: '',
-                profession: ''
-            });
-            setSelectedMembre([]);
-        }
-        setDialogOpen(true);
-    };
-
-    const handleCloseDialog = () => {
-        setDialogOpen(false);
-        setSelectedMembre([]);
-    };
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        try {
-            if (selectedMembre) {
-                await axios.put(`/api/membres/${selectedMembre.id_membre}`, formData);
-            } else {
-                await axios.post('/api/membres', formData);
+        const fetchMembers = async () => {
+            setLoading(true);
+            try {
+                const response = await axios.get('http://localhost:5001/api/membres', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                // Tri alphabétique côté frontend pour garantir l'ordre
+                const sortedMembers = (response.data || []).sort((a, b) => {
+                    const nameA = `${a.nom} ${a.prenom}`.toLowerCase();
+                    const nameB = `${b.nom} ${b.prenom}`.toLowerCase();
+                    return nameA.localeCompare(nameB, 'fr');
+                });
+                setMembers(sortedMembers);
+                setError(null);
+            } catch (err) {
+                console.error("Erreur de chargement des membres:", err);
+                setError("Impossible de charger la liste des membres. Vérifiez la connexion API.");
+                setMembers([]);
+            } finally {
+                setLoading(false);
             }
-            fetchMembres();
-            handleCloseDialog();
-        } catch (error) {
-            setError('Erreur lors de la sauvegarde');
+        };
+
+        if (token) {
+            fetchMembers();
         }
+    }, [token]);
+
+    const formatDate = (isoString) => {
+        if (!isoString) return 'N/A';
+        return new Date(isoString).toLocaleDateString('fr-FR');
     };
 
-    const handleDelete = async (id) => {
+    const handleDelete = async (memberId) => {
         if (window.confirm('Êtes-vous sûr de vouloir supprimer ce membre ?')) {
             try {
-                await axios.delete(`/api/membres/${id}`);
-                fetchMembres();
-            } catch (error) {
-                setError('Erreur lors de la suppression');
+                await axios.delete(`http://localhost:5001/api/membres/${memberId}`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                // Rafraîchir la liste des membres
+                const response = await axios.get('http://localhost:5001/api/membres', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                // Maintenir le tri alphabétique
+                const sortedMembers = (response.data || []).sort((a, b) => {
+                    const nameA = `${a.nom} ${a.prenom}`.toLowerCase();
+                    const nameB = `${b.nom} ${b.prenom}`.toLowerCase();
+                    return nameA.localeCompare(nameB, 'fr');
+                });
+                setMembers(sortedMembers);
+            } catch (err) {
+                console.error("Erreur lors de la suppression:", err);
+                setError("Erreur lors de la suppression du membre");
             }
         }
     };
 
-    const getStatusColor = (statut) => {
-        switch (statut) {
-            case 'Actif': return 'success';
-            case 'Inactif': return 'error';
-            case 'Régulier': return 'info';
-            default: return 'default';
+    const handleSelectMember = (memberId) => {
+        setSelectedMembers(prev => 
+            prev.includes(memberId) 
+                ? prev.filter(id => id !== memberId)
+                : [...prev, memberId]
+        );
+    };
+
+    const handleSelectAll = (event) => {
+        if (event.target.checked) {
+            setSelectedMembers(members.map(member => member.id));
+        } else {
+            setSelectedMembers([]);
         }
     };
 
-    if (loading) {
-        return (
-            <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
-                <CircularProgress />
-            </Box>
-        );
-    }
+    const handlePrintMenuOpen = (event) => {
+        setPrintMenuAnchor(event.currentTarget);
+    };
+
+    const handlePrintMenuClose = () => {
+        setPrintMenuAnchor(null);
+    };
+
+    const printMembers = (membersToPrint) => {
+        const printWindow = window.open('', '_blank');
+        const currentDate = new Date().toLocaleDateString('fr-FR');
+        
+        const printContent = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Liste des Membres - LJMDI</title>
+                <style>
+                    body { font-family: Arial, sans-serif; margin: 20px; }
+                    h1 { color: #19d279; text-align: center; }
+                    .header { text-align: center; margin-bottom: 30px; }
+                    .date { text-align: right; margin-bottom: 20px; font-style: italic; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                    th { background-color: #f2f2f2; font-weight: bold; }
+                    .member-id { font-family: monospace; font-size: 0.9em; color: #666; }
+                    .total { margin-top: 20px; font-weight: bold; }
+                    @media print {
+                        .no-print { display: none; }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <h1>Liste des Membres - LJMDI</h1>
+                    <p>Système de Gestion Intégrale</p>
+                </div>
+                <div class="date">Date d'impression: ${currentDate}</div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>N°</th>
+                            <th>ID Membre</th>
+                            <th>Nom & Prénom</th>
+                            <th>Email</th>
+                            <th>Téléphone</th>
+                            <th>Profession</th>
+                            <th>Rôle</th>
+                            <th>Date d'Adhésion</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${membersToPrint.map((member, index) => `
+                            <tr>
+                                <td>${index + 1}</td>
+                                <td class="member-id">${member.member_id}</td>
+                                <td>${member.nom} ${member.prenom}</td>
+                                <td>${member.email}</td>
+                                <td>${member.telephone || 'N/A'}</td>
+                                <td>${member.profession || 'N/A'}</td>
+                                <td>${member.role}</td>
+                                <td>${formatDate(member.date_creation)}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+                <div class="total">
+                    Total: ${membersToPrint.length} membre(s)
+                </div>
+                <script>
+                    window.onload = function() {
+                        window.print();
+                    }
+                </script>
+            </body>
+            </html>
+        `;
+        
+        printWindow.document.write(printContent);
+        printWindow.document.close();
+    };
+
+    const handlePrintAll = () => {
+        printMembers(members);
+        handlePrintMenuClose();
+    };
+
+    const handlePrintSelected = () => {
+        const selected = members.filter(member => selectedMembers.includes(member.id));
+        if (selected.length === 0) {
+            alert('Veuillez sélectionner au moins un membre à imprimer');
+            return;
+        }
+        printMembers(selected);
+        handlePrintMenuClose();
+    };
 
     return (
-        <Box>
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-                <Typography variant="h4">Gestion des Membres</Typography>
-                {hasPermission('membres') && (
+        <Container sx={{ mt: 4 }}>
+            <Typography variant="h4" component="h1" gutterBottom>
+                Gestion des Membres
+            </Typography>
+
+            <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
+                <Button
+                    variant="contained"
+                    color="primary"
+                    startIcon={<Add />}
+                    sx={{ bgcolor: '#19d279', '&:hover': { bgcolor: '#12a85e' } }}
+                    onClick={() => navigate('/membres/ajouter')}
+                >
+                    Ajouter un Membre
+                </Button>
+                
+                <Button
+                    variant="contained"
+                    color="secondary"
+                    startIcon={<Print />}
+                    onClick={handlePrintMenuOpen}
+                    sx={{ bgcolor: '#2196F3', '&:hover': { bgcolor: '#1976D2' } }}
+                >
+                    Imprimer
+                </Button>
+
+                {selectedMembers.length > 0 && (
                     <Button
-                        variant="contained"
-                        startIcon={<AddIcon />}
-                        onClick={() => handleOpenDialog()}
+                        variant="outlined"
+                        sx={{ borderColor: '#19d279', color: '#19d279' }}
                     >
-                        Nouveau Membre
+                        {selectedMembers.length} membre(s) sélectionné(s)
                     </Button>
                 )}
             </Box>
 
-            {error && (
-                <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
-                    {error}
-                </Alert>
-            )}
+            <Menu
+                anchorEl={printMenuAnchor}
+                open={Boolean(printMenuAnchor)}
+                onClose={handlePrintMenuClose}
+            >
+                <MenuItem onClick={handlePrintAll}>
+                    <ListItemIcon>
+                        <Print />
+                    </ListItemIcon>
+                    <ListItemText>
+                        Imprimer toute la liste
+                    </ListItemText>
+                </MenuItem>
+                <MenuItem onClick={handlePrintSelected}>
+                    <ListItemIcon>
+                        <PrintDisabled />
+                    </ListItemIcon>
+                    <ListItemText>
+                        Imprimer la sélection ({selectedMembers.length})
+                    </ListItemText>
+                </MenuItem>
+            </Menu>
 
-            <Paper>
-                <TableContainer>
+            {loading && <Box sx={{ display: 'flex', justifyContent: 'center' }}><CircularProgress /></Box>}
+            {error && <Alert severity="error">{error}</Alert>}
+
+            {!loading && !error && (
+                <TableContainer component={Paper}>
                     <Table>
                         <TableHead>
-                            <TableRow>
-                                <TableCell>Photo</TableCell>
-                                <TableCell>Nom</TableCell>
+                            <TableRow sx={{ backgroundColor: '#f0f0f0' }}>
+                                <TableCell padding="checkbox">
+                                    <Checkbox
+                                        indeterminate={selectedMembers.length > 0 && selectedMembers.length < members.length}
+                                        checked={members.length > 0 && selectedMembers.length === members.length}
+                                        onChange={handleSelectAll}
+                                    />
+                                </TableCell>
+                                <TableCell>N°</TableCell>
+                                <TableCell>ID Membre</TableCell>
+                                <TableCell>Nom & Prénom (A-Z)</TableCell>
                                 <TableCell>Email</TableCell>
                                 <TableCell>Téléphone</TableCell>
-                                <TableCell>Date Adhésion</TableCell>
-                                <TableCell>Statut</TableCell>
+                                <TableCell>Rôle</TableCell>
+                                <TableCell>Date d'Adhésion</TableCell>
                                 <TableCell>Actions</TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
-                            {membres.map((membre) => (
-                                <TableRow key={membre.id_membre}>
-                                    <TableCell>
-                                        <Avatar sx={{ bgcolor: 'primary.main' }}>
-                                            {membre.nom?.charAt(0)}{membre.prenom?.charAt(0)}
-                                        </Avatar>
-                                    </TableCell>
-                                    <TableCell>
-                                        <Typography variant="subtitle2">
-                                            {membre.nom} {membre.prenom}
-                                        </Typography>
-                                        <Typography variant="body2" color="text.secondary">
-                                            {membre.profession}
-                                        </Typography>
-                                    </TableCell>
-                                    <TableCell>
-                                        <Box display="flex" alignItems="center">
-                                            <EmailIcon sx={{ mr: 1, fontSize: 16 }} />
-                                            {membre.email}
-                                        </Box>
-                                    </TableCell>
-                                    <TableCell>
-                                        <Box display="flex" alignItems="center">
-                                            <PhoneIcon sx={{ mr: 1, fontSize: 16 }} />
-                                            {membre.telephone}
-                                        </Box>
-                                    </TableCell>
-                                    <TableCell>
-                                        {new Date(membre.date_adhesion).toLocaleDateString('fr-FR')}
-                                    </TableCell>
-                                    <TableCell>
-                                        <Chip
-                                            label={membre.statut}
-                                            color={getStatusColor(membre.statut)}
-                                            size="small"
+                            {members.map((member, index) => (
+                                <TableRow key={member.id} hover>
+                                    <TableCell padding="checkbox">
+                                        <Checkbox
+                                            checked={selectedMembers.includes(member.id)}
+                                            onChange={() => handleSelectMember(member.id)}
                                         />
                                     </TableCell>
+                                    <TableCell>{index + 1}</TableCell>
                                     <TableCell>
-                                        <Tooltip title="Voir détails">
-                                            <IconButton size="small" onClick={() => handleOpenDialog(membre)}>
-                                                <ViewIcon />
-                                            </IconButton>
-                                        </Tooltip>
-                                        {hasPermission('membres') && (
-                                            <>
-                                                <Tooltip title="Modifier">
-                                                    <IconButton size="small" onClick={() => handleOpenDialog(membre)}>
-                                                        <EditIcon />
-                                                    </IconButton>
-                                                </Tooltip>
-                                                <Tooltip title="Supprimer">
-                                                    <IconButton size="small" onClick={() => handleDelete(membre.id_membre)}>
-                                                        <DeleteIcon />
-                                                    </IconButton>
-                                                </Tooltip>
-                                            </>
-                                        )}
+                                        <Box sx={{ fontFamily: 'monospace', fontSize: '0.8rem', color: '#666' }}>
+                                            {member.member_id}
+                                        </Box>
+                                    </TableCell>
+                                    <TableCell>{member.nom} {member.prenom}</TableCell>
+                                    <TableCell>{member.email}</TableCell>
+                                    <TableCell>{member.telephone || 'N/A'}</TableCell>
+                                    <TableCell>{member.role}</TableCell>
+                                    <TableCell>{formatDate(member.date_creation)}</TableCell>
+                                    <TableCell>
+                                        <Box sx={{ display: 'flex', gap: 1 }}>
+                                            <Button 
+                                                size="small" 
+                                                startIcon={<Visibility />}
+                                                onClick={() => navigate(`/membres/${member.id}`)}
+                                            >
+                                                Voir
+                                            </Button>
+                                            <Button 
+                                                size="small" 
+                                                startIcon={<Edit />}
+                                                onClick={() => navigate(`/membres/${member.id}/modifier`)}
+                                            >
+                                                Modifier
+                                            </Button>
+                                            <Button 
+                                                size="small" 
+                                                color="error"
+                                                startIcon={<Delete />}
+                                                onClick={() => handleDelete(member.id)}
+                                            >
+                                                Supprimer
+                                            </Button>
+                                        </Box>
                                     </TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>
                     </Table>
+                    {members.length === 0 && (
+                        <Typography sx={{ p: 2, textAlign: 'center' }}>
+                            Aucun membre trouvé.
+                        </Typography>
+                    )}
                 </TableContainer>
-            </Paper>
-
-            {/* Dialog pour ajouter/modifier un membre */}
-            <Dialog open={dialogOpen} onClose={handleCloseDialog} maxWidth="md" fullWidth>
-                <DialogTitle>
-                    {selectedMembre ? 'Modifier le Membre' : 'Nouveau Membre'}
-                </DialogTitle>
-                <form onSubmit={handleSubmit}>
-                    <DialogContent>
-                        <Grid container spacing={2} sx={{ mt: 1 }}>
-                            <Grid item xs={12} sm={6}>
-                                <TextField
-                                    fullWidth
-                                    label="Nom"
-                                    name="nom"
-                                    value={formData.nom}
-                                    onChange={(e) => setFormData({ ...formData, nom: e.target.value })}
-                                    required
-                                />
-                            </Grid>
-                            <Grid item xs={12} sm={6}>
-                                <TextField
-                                    fullWidth
-                                    label="Prénom"
-                                    name="prenom"
-                                    value={formData.prenom}
-                                    onChange={(e) => setFormData({ ...formData, prenom: e.target.value })}
-                                    required
-                                />
-                            </Grid>
-                            <Grid item xs={12} sm={6}>
-                                <TextField
-                                    fullWidth
-                                    label="Email"
-                                    name="email"
-                                    type="email"
-                                    value={formData.email}
-                                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                    required
-                                />
-                            </Grid>
-                            <Grid item xs={12} sm={6}>
-                                <TextField
-                                    fullWidth
-                                    label="Téléphone"
-                                    name="telephone"
-                                    value={formData.telephone}
-                                    onChange={(e) => setFormData({ ...formData, telephone: e.target.value })}
-                                    required
-                                />
-                            </Grid>
-                            <Grid item xs={12} sm={6}>
-                                <TextField
-                                    fullWidth
-                                    label="Date d'Adhésion"
-                                    name="date_adhesion"
-                                    type="date"
-                                    value={formData.date_adhesion}
-                                    onChange={(e) => setFormData({ ...formData, date_adhesion: e.target.value })}
-                                    InputLabelProps={{ shrink: true }}
-                                    required
-                                />
-                            </Grid>
-                            <Grid item xs={12} sm={6}>
-                                <TextField
-                                    fullWidth
-                                    select
-                                    label="Statut"
-                                    name="statut"
-                                    value={formData.statut}
-                                    onChange={(e) => setFormData({ ...formData, statut: e.target.value })}
-                                    required
-                                >
-                                    {statuts.map((option) => (
-                                        <MenuItem key={option.value} value={option.value}>
-                                            {option.label}
-                                        </MenuItem>
-                                    ))}
-                                </TextField>
-                            </Grid>
-                            <Grid item xs={12}>
-                                <TextField
-                                    fullWidth
-                                    label="Adresse"
-                                    name="adresse"
-                                    multiline
-                                    rows={2}
-                                    value={formData.adresse}
-                                    onChange={(e) => setFormData({ ...formData, adresse: e.target.value })}
-                                />
-                            </Grid>
-                            <Grid item xs={12}>
-                                <TextField
-                                    fullWidth
-                                    label="Profession"
-                                    name="profession"
-                                    value={formData.profession}
-                                    onChange={(e) => setFormData({ ...formData, profession: e.target.value })}
-                                />
-                            </Grid>
-                        </Grid>
-                    </DialogContent>
-                    <DialogActions>
-                        <Button onClick={handleCloseDialog}>Annuler</Button>
-                        <Button type="submit" variant="contained">
-                            {selectedMembre ? 'Modifier' : 'Ajouter'}
-                        </Button>
-                    </DialogActions>
-                </form>
-            </Dialog>
-        </Box>
+            )}
+        </Container>
     );
-}
+};
+
+export default Members;
+

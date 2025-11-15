@@ -1,28 +1,6 @@
-version: '3.8'
-
 services:
   # ----------------------------------
-  # Service Backend (API Node.js)
-  # ----------------------------------
-  api:
-    build:
-      context: . # Assurez-vous que ce chemin est correct
-      dockerfile: Dockerfile
-    container_name: ljmdi_api
-    restart: always
-    ports:
-      - "5000:5000" # Le Backend doit être sur le port 5000 pour React
-    depends_on:
-      - db
-    environment:
-      # Variables d'environnement pour connecter l'API à la base de données
-      DATABASE_URL: postgres://user:password@db:5432/ljmdi_db
-      NODE_ENV: development
-      PORT: 5000
-      JWT_SECRET: votre_clé_secrete_securisee # Remplacez ceci par une vraie clé
-
-  # ----------------------------------
-  # Service Base de Données (PostgreSQL)
+  # 1. Service Base de Données (PostgreSQL)
   # ----------------------------------
   db:
     image: postgres:14-alpine
@@ -32,10 +10,48 @@ services:
       POSTGRES_USER: user
       POSTGRES_PASSWORD: password
       POSTGRES_DB: ljmdi_db
-    volumes:
-      - postgres_data:/var/lib/postgresql/data # Persistance des données
-    ports:
-      - "5432:5432" # Optionnel, pour se connecter avec un outil externe
 
+    ports:
+      - "5432:5432"
+
+    volumes:
+      # Persistance des données
+      - postgres_data:/var/lib/postgresql/data
+      # Montage des scripts SQL
+      - ./create_users_table.sql:/tmp/create_users_table.sql
+      - ./create_documents_table.sql:/tmp/create_documents_table.sql
+
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U user -d ljmdi_db" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ----------------------------------
+  # 2. Service Backend (API Node.js/Express)
+  # ----------------------------------
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ljmdi_api
+    restart: always
+    ports:
+      - "5000:5000"
+
+    # L'API attendra que la DB soit prête
+    depends_on:
+      db:
+        condition: service_healthy
+
+    environment:
+      DATABASE_URL: postgres://user:password@db:5432/ljmdi_db
+      NODE_ENV: development
+      PORT: 5000
+      JWT_SECRET: votre_clé_secrete_securisee
+
+# ----------------------------------
+# Définition des Volumes Persistants
+# ----------------------------------
 volumes:
   postgres_data:
